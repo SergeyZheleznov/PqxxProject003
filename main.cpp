@@ -184,8 +184,6 @@ void find_client(pqxx::connection& c)
 	std::getline(std::cin, telephone_number);
 
 	pqxx::transaction t(c);
-	// Данный запрос хорошо работает в dbreaver, я имею ввиду запрос
-	//select* from clients where first_name like 'Sergey' or last_name like 'ttt' or email like 'ttt'
 	//При запуске запроса на строке 189 я получаю вот такое сообщение. Не понятно, где ошибка, не могли бы подсказать?
 	//Error: Tried to extract 0 field(s) from a result with 7 column(s).
 	t.query("select * from clients where first_name like '" + first_name + "' or last_name like '" + last_name + "' or email like '" + e_mail + "'; "
@@ -208,24 +206,17 @@ int main()
 			"dbname=dbPqxxProject002 "
 			"user=postgres "
 			"password=111111");
-		
-		// создаём prepared statement
-
-		//c.prepare("create_tables", )
 
 		// вызываем метод, который создаёт нам таблицу с информацией о клиента.
 		create_tables_if_not_exists(c);
-
 		// здесь пока нужно всякий раз вручную удалять нового клиента, пока не настроил.
 		std::cout << "If you want add new client, print 1, if you want add telephone to client, print 2, "
 			"if you want change client's data, print 3, if you want delete tel number of exist client, print 4, "
 			"if you want delete exist client, print 5, if you want find client with his data print 6, "
 			" if you want finished work, print 0" << std::endl;
-
 		int a;
 		std::cout << "You decision: ";
 		std::cin >> a;
-
 		if (a == 1)
 		{
 			// вызываем метод, который добавляет нового клиента.
