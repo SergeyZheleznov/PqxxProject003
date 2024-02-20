@@ -6,6 +6,8 @@
 
 #pragma execution_character_set()
 
+using namespace std;
+
 // это метод, которые создаёт таблицу для хранения персональной информации о клиенте
 // и связанную таблицу с телефонами по схеме один ко многим
 // таблица clients хранит уникальный номер клиента(его id), его имя. фамилию, электронную почту
@@ -24,8 +26,8 @@ void create_tables_if_not_exists(pqxx::connection& c)
 		"Create table if not exists telephones"
 		"("
 		"id serial primary key,"
-		"clients_id integer references clients(id),"
-		"number int"
+		"clients_id int references clients(id),"
+		"number text"
 		");"
 	);
 	t.commit();
@@ -53,7 +55,7 @@ void add_new_client(pqxx::connection& c)
 	std::getline(std::cin, email);
 
 	pqxx::transaction t(c);
-	t.exec("insert into clients(first_name, last_name, email) values('" + first_name + "',  '" + last_name + "',  '" + email + "')");
+	t.exec("insert into clients(first_name, last_name, email) values('" + t.esc(first_name) + "',  '" + t.esc(last_name) + "',  '" + t.esc(email) + "')");
 
 	t.commit();
 }
@@ -76,7 +78,7 @@ void add_new_telephone_number(pqxx::connection& c)
 
 	pqxx::transaction t(c);
 
-	t.exec("insert into telephones(clients_id, number) values('" + id_of_client + "', '" + telephone_number + "')");
+	t.exec("insert into telephones(clients_id, number) values('" + t.esc(id_of_client) + "', '" + t.esc(telephone_number) + "')");
 
 	t.commit();
 }
@@ -110,7 +112,7 @@ void change_clients_data(pqxx::connection& c)
 
 	pqxx::transaction t(c);
 
-	t.exec("update clients set first_name = '" + first_name + "', last_name = '" + last_name + "', email = '" + email + "' where id = '" + id_of_client + "'; ");
+	t.exec("update clients set first_name = '" + t.esc(first_name) + "', last_name = '" + t.esc(last_name) + "', email = '" + t.esc(email) + "' where id = '" + t.esc(id_of_client) + "'; ");
 
 	t.commit();
 }
@@ -134,7 +136,7 @@ void delete_telephone(pqxx::connection& c)
 
 	pqxx::transaction t(c);
 
-	t.exec("delete from telephones where clients_id = '" + id_of_client + "' and number = '" + deleting_phone_number + "'; ");
+	t.exec("delete from telephones where clients_id = '" + t.esc(id_of_client) + "' and number = '" + t.esc(deleting_phone_number) + "'; ");
 
 	t.commit();
 }
@@ -152,16 +154,15 @@ void delete_client(pqxx::connection& c)
 
 	pqxx::transaction t(c);
 
-	t.exec("delete from telephones where clients_id = '" + id_of_client + "'; delete from clients where id = '" + id_of_client + "';" );
+	t.exec("delete from telephones where clients_id = '" + t.esc(id_of_client) + "'; delete from clients where id = '" + t.esc(id_of_client) + "';" );
 	t.commit();
 }
 
 // метод, позволяющий найти клиета его данным, цифра 6
 // можно найти клиента по его данным - имени, фамилии, электронной почте или телефону.
-// метод тоже не работает
+// метод тоже работает, если при запросе телефона вводить цифры, поскольку это тип int
 void find_client(pqxx::connection& c)
 {
-
 	std::string first_name;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 	std::cout << "Enter clients first name: ";
@@ -177,20 +178,35 @@ void find_client(pqxx::connection& c)
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 	std::cout << "Enter clients e-mail: ";
 	std::getline(std::cin, e_mail);
+	
 
 	std::string telephone_number;
 	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 	std::cout << "Enter clients telephone number: ";
 	std::getline(std::cin, telephone_number);
+	
+	pqxx::transaction t1(c);
+		
+	auto result1 = t1.query<int, std::string, std::string, std::string>("select * from clients where first_name like '" + t1.esc(first_name) + "' or last_name like '" + t1.esc(last_name) + "' or email like '" + t1.esc(e_mail) + "';");
+	
+	for (std::tuple<int, std::string, std::string, std::string> record :result1)
+	{
+		std::cout << " Id = " << get<0>(record) << " first name = " << get<1>(record) <<  " last_name = " << get<2>(record) << " e-mail = " << get<3>(record) << std::endl;
+	}
+	
+	t1.commit();
 
-	pqxx::transaction t(c);
-	//При запуске запроса на строке 189 я получаю вот такое сообщение. Не понятно, где ошибка, не могли бы подсказать?
-	//Error: Tried to extract 0 field(s) from a result with 7 column(s).
-	t.query("select * from clients where first_name like '" + first_name + "' or last_name like '" + last_name + "' or email like '" + e_mail + "'; "
-		"select * from clients inner join telephones on clients.id = telephones.clients_id "
-		"where number = '" + telephone_number + "';");
+	pqxx::transaction t2(c);
 
-	t.commit();
+	auto result2 = t2.query<int, std::string, std::string, std::string, int, int, std::string>("select * from clients inner join telephones on clients.id = telephones.clients_id"
+		" where number = '" + t2.esc(telephone_number) + "';");
+	for (std::tuple<int, std::string, std::string, std::string, int, int, std::string> record : result2)
+	{
+		std::cout << " Id = " << get<0>(record) << " first name = " << get<1>(record) << " last_name = " << get<2>(record) << " e-mail = " << get<3>(record)
+			<< " id = " << get<4>(record) << " clients_id = " << get<5>(record) << " telephone number = " << get<6>(record)
+			<< std::endl;
+	}
+	t2.commit();
 }
 
 int main()
